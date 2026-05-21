@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.05);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.4);
+}
+
+/* Dark mode-ish styling for the scrollbars */
+.dark-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+.dark-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+.dark-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Pulse animation for safety alerts */
+@keyframes critical-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+.pulse-critical {
+  animation: critical-pulse 2s infinite ease-in-out;
+}
+
+/* Printable report styles */
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+    font-family: 'Inter', system-ui, sans-serif !important;
+    font-size: 11pt !important;
+    margin: 0 !important;
+    padding: 1.5cm !important;
+  }
+
+  /* Hide interactive interface parts during printing */
+  .no-print,
+  button,
+  input,
+  select,
+  nav,
+  aside,
+  .sidebar-nav,
+  .controls-panel,
+  .interactive-hint,
+  .save-actions,
+  .advanced-mode-toggle {
+    display: none !important;
+  }
+
+  /* Format main container for printing */
+  .print-container {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Show print-only header/elements */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Ensure high-contrast charts and set standard aspect ratio */
+  .recharts-responsive-container {
+    width: 100% !important;
+    height: 300px !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Keep metric grid in 2-column or 4-column print layout */
+  .metrics-grid-print {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 12px !important;
+    margin-bottom: 24px !important;
+    page-break-inside: avoid !important;
+  }
+
+  .metric-card-print {
+    border: 1px solid #cbd5e1 !important;
+    background: #f8fafc !important;
+    padding: 12px !important;
+    border-radius: 4px !important;
+    text-align: center !important;
+  }
+
+  /* Adjust section layout for printed columns */
+  .main-print-grid {
+    display: block !important;
+  }
+
+  .print-panel-block {
+    margin-bottom: 24px !important;
+    page-break-inside: avoid !important;
+  }
+  
+  .border-print {
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    padding: 16px !important;
+    background: white !important;
+  }
+
+  /* Keep colors legible */
+  .text-emerald-600 {
+    color: #059669 !important;
+  }
+  .text-amber-600 {
+    color: #d97706 !important;
+  }
+  .text-red-600 {
+    color: #dc2626 !important;
+  }
+  .bg-red-50 {
+    background-color: #fef2f2 !important;
+    border-color: #fca5a5 !important;
+  }
+  .bg-amber-50 {
+    background-color: #fffbeb !important;
+    border-color: #fcd34d !important;
+  }
+}
