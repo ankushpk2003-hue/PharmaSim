@@ -93,8 +93,8 @@ export default function App() {
   const [newCaseName, setNewCaseName] = useState('');
   
   // Real-time calculated baseline Cl & Vd
-  const cl = isAdvancedMode ? customCl : PATIENT_PROFILES[selectedProfileId].cl;
-  const vd = isAdvancedMode ? customVd : PATIENT_PROFILES[selectedProfileId].vd;
+  const cl = Number(isAdvancedMode ? customCl : PATIENT_PROFILES[selectedProfileId].cl);
+  const vd = Number(isAdvancedMode ? customVd : PATIENT_PROFILES[selectedProfileId].vd);
 
   // PK Equations
   const ke = vd > 0 ? cl / vd : 0; // elimination constant (1/h)
@@ -104,15 +104,15 @@ export default function App() {
   // Peak and Trough Steady State Calculations
   // Css,max = (D/Vd) / (1 - exp(-ke * tau))
   // Css,min = Css,max * exp(-ke * tau)
-  const expTerm1 = Math.exp(-ke * interval);
-  const cssMax = vd > 0 && (1 - expTerm1) > 0 ? (dose / vd) / (1 - expTerm1) : 0;
+  const expTerm1 = Math.exp(-ke * Number(interval));
+  const cssMax = vd > 0 && (1 - expTerm1) > 0 ? (Number(dose) / vd) / (1 - expTerm1) : 0;
   const cssMin = cssMax * expTerm1;
 
   // Dynamic "What-If" Sensitivity Calculations
   const clDegraded = cl * 0.8; // 20% degradation
   const keDegraded = vd > 0 ? clDegraded / vd : 0;
-  const expTermDegraded = Math.exp(-keDegraded * interval);
-  const cssMaxDegraded = vd > 0 && (1 - expTermDegraded) > 0 ? (dose / vd) / (1 - expTermDegraded) : 0;
+  const expTermDegraded = Math.exp(-keDegraded * Number(interval));
+  const cssMaxDegraded = vd > 0 && (1 - expTermDegraded) > 0 ? (Number(dose) / vd) / (1 - expTermDegraded) : 0;
 
   // Load profile values when profile changes and not in advanced mode
   useEffect(() => {
@@ -188,28 +188,144 @@ export default function App() {
   // Generate 72-hour PK data points (every 0.5 hours)
   const chartData = [];
   if (vd > 0 && ke > 0) {
+    const numInterval = Number(interval);
+    const numDose = Number(dose);
     for (let T = 0; T <= 72; T += 0.5) {
-      const n = Math.floor(T / interval) + 1;
-      const t = T - (n - 1) * interval;
+      const n = Math.floor(T / numInterval) + 1;
+      const t = T - (n - 1) * numInterval;
       
-      const expN = Math.exp(-n * ke * interval);
-      const exp1 = Math.exp(-ke * interval);
+      const expN = Math.exp(-n * ke * numInterval);
+      const exp1 = Math.exp(-ke * numInterval);
       const expT = Math.exp(-ke * t);
 
       // C(t) equation
-      let concentration = (dose / vd) * ((1 - expN) / (1 - exp1)) * expT;
+      let concentration = (numDose / vd) * ((1 - expN) / (1 - exp1)) * expT;
       
       chartData.push({
         time: T,
         concentration: parseFloat(concentration.toFixed(2)),
-        isDoseTime: T % interval === 0
+        isDoseTime: T % numInterval === 0
       });
     }
   }
 
   // Safety status evaluations
-  const isToxic = cssMax > toxicThreshold;
-  const isSubTherapeutic = cssMin < mec;
+  const isToxic = cssMax > Number(toxicThreshold);
+  const isSubTherapeutic = cssMin < Number(mec);
+
+  // Smart dynamic dosing recommendation logic
+  const numInterval = Number(interval);
+  const numDose = Number(dose);
+  const numToxicThreshold = Number(toxicThreshold);
+  const numMec = Number(mec);
+  
+  const singleDosePeak = vd > 0 ? numDose / vd : 0;
+  const isDoseTooHigh = singleDosePeak > numToxicThreshold;
+
+  // Real-time safety & efficacy margin percentages
+  const peakSafetyMargin = numToxicThreshold > 0 ? (cssMax / numToxicThreshold) * 100 : 0;
+  const troughEfficacyMargin = numMec > 0 ? (cssMin / numMec) * 100 : 0;
+
+  // Recommendation logic:
+  // type: 'optimal' | 'toxic-dose-high' | 'toxic-interval-adjust' | 'subtherapeutic-dose-low' | 'subtherapeutic-interval-adjust' | 'therapeutic-conflict'
+  let recommendationType = 'optimal';
+  let recommendedInterval = numInterval;
+  let cssMaxAtRecommended = cssMax;
+  let cssMinAtRecommended = cssMin;
+
+  if (isToxic) {
+    if (isDoseTooHigh) {
+      recommendationType = 'toxic-dose-high';
+      recommendedInterval = null;
+    } else {
+      recommendationType = 'toxic-interval-adjust';
+      if (ke > 0) {
+        const ratio = singleDosePeak / numToxicThreshold;
+        if (ratio < 0.9999) {
+          const exactSafeTau = -Math.log(1 - ratio) / ke;
+          let candidateInterval = Math.ceil(exactSafeTau);
+          if (candidateInterval <= numInterval) {
+            candidateInterval = numInterval + 1;
+          }
+          
+          let testCssMax = cssMax;
+          let testCssMin = cssMin;
+          let count = 0;
+          do {
+            const testExp = Math.exp(-ke * candidateInterval);
+            testCssMax = vd > 0 && (1 - testExp) > 0 ? singleDosePeak / (1 - testExp) : 0;
+            testCssMin = testCssMax * testExp;
+            if (testCssMax <= numToxicThreshold) {
+              break;
+            }
+            candidateInterval++;
+            count++;
+          } while (candidateInterval < 100 && count < 100);
+          
+          recommendedInterval = candidateInterval;
+          cssMaxAtRecommended = testCssMax;
+          cssMinAtRecommended = testCssMin;
+        } else {
+          recommendationType = 'toxic-dose-high';
+          recommendedInterval = null;
+        }
+      } else {
+        recommendedInterval = null;
+      }
+    }
+  } else if (isSubTherapeutic) {
+    if (ke > 0 && numMec > 0) {
+      const term = numDose / (vd * numMec);
+      const exactSafeTau = Math.log(1 + term) / ke;
+      let candidateInterval = Math.floor(exactSafeTau);
+      
+      // Clamp to range limits [4, 24]
+      if (candidateInterval > 24) candidateInterval = 24;
+      
+      if (candidateInterval < 4) {
+        recommendationType = 'subtherapeutic-dose-low';
+        recommendedInterval = null;
+      } else {
+        const testExp = Math.exp(-ke * candidateInterval);
+        const testCssMax = vd > 0 && (1 - testExp) > 0 ? singleDosePeak / (1 - testExp) : 0;
+        const testCssMin = testCssMax * testExp;
+        
+        if (testCssMax > numToxicThreshold) {
+          recommendationType = 'therapeutic-conflict';
+          recommendedInterval = null;
+        } else {
+          recommendationType = 'subtherapeutic-interval-adjust';
+          recommendedInterval = candidateInterval;
+          cssMaxAtRecommended = testCssMax;
+          cssMinAtRecommended = testCssMin;
+        }
+      }
+    } else {
+      recommendedInterval = null;
+    }
+  } else {
+    recommendationType = 'optimal';
+    recommendedInterval = numInterval;
+    cssMaxAtRecommended = cssMax;
+    cssMinAtRecommended = cssMin;
+  }
+
+  // Debug calculations log to console
+  console.log("PharmaSim calculations debug:", {
+    dose: numDose,
+    interval: numInterval,
+    cl,
+    vd,
+    ke,
+    cssMax,
+    toxicThreshold: numToxicThreshold,
+    isToxic,
+    isSubTherapeutic,
+    recommendationType,
+    recommendedInterval,
+    cssMaxAtRecommended,
+    cssMinAtRecommended
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row text-slate-800 antialiased font-sans">
@@ -753,9 +869,50 @@ export default function App() {
               <div>
                 <h3 className="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-emerald-400" />
-                  <span>Clinical Sensitivity Analysis (What-If Model)</span>
+                  <span>Clinical Sensitivity Analysis & Safety Monitors</span>
                 </h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">Automated stress-testing parameters based on biological decay kinetics.</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Automated stress-testing parameters and real-time safety margin indexes.</p>
+              </div>
+
+              {/* Real-time Safety & Efficacy Gauges */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
+                {/* Peak Meter */}
+                <div>
+                  <div className="flex justify-between items-center text-[10px] font-bold mb-1.5">
+                    <span className="text-slate-400 uppercase tracking-wider">Peak Safety Margin</span>
+                    <span className={isToxic ? 'text-rose-400 font-mono' : 'text-emerald-400 font-mono'}>
+                      {peakSafetyMargin.toFixed(1)}% {isToxic ? 'Over Limit!' : 'of Toxic limit'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-900">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-300 ${isToxic ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' : 'bg-emerald-500'}`}
+                      style={{ width: `${Math.min(100, peakSafetyMargin)}%` }}
+                    />
+                  </div>
+                  <p className="text-[9px] text-slate-500 mt-1 font-mono">
+                    Peak Css Max: {cssMax.toFixed(2)} / Limit {numToxicThreshold} mg/L
+                  </p>
+                </div>
+
+                {/* Trough Meter */}
+                <div>
+                  <div className="flex justify-between items-center text-[10px] font-bold mb-1.5">
+                    <span className="text-slate-400 uppercase tracking-wider">Trough Efficacy Margin</span>
+                    <span className={isSubTherapeutic ? 'text-amber-400 font-mono' : 'text-emerald-400 font-mono'}>
+                      {troughEfficacyMargin.toFixed(1)}% {isSubTherapeutic ? 'Sub-therapeutic' : 'of MEC target'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-900">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-300 ${isSubTherapeutic ? 'bg-amber-500 shadow-[0_0_8px_#f59e0b]' : 'bg-emerald-500'}`}
+                      style={{ width: `${Math.min(100, troughEfficacyMargin)}%` }}
+                    />
+                  </div>
+                  <p className="text-[9px] text-slate-500 mt-1 font-mono">
+                    Trough Css Min: {cssMin.toFixed(2)} / MEC {numMec} mg/L
+                  </p>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-800 pt-4">
@@ -774,24 +931,120 @@ export default function App() {
                   </p>
                 </div>
 
-                {/* Scenario B */}
-                <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800/80">
-                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-1">
+                {/* Scenario B: Bidirectional Recommendation Card */}
+                <div className={`p-4 rounded-xl border transition-all duration-300 ${
+                  recommendationType === 'optimal' 
+                    ? 'bg-emerald-950/30 border-emerald-800/80 text-slate-200' 
+                    : recommendationType === 'toxic-interval-adjust' || recommendationType === 'subtherapeutic-interval-adjust'
+                      ? 'bg-amber-950/30 border-amber-800/80 text-slate-200 shadow-lg shadow-amber-950/10'
+                      : 'bg-rose-950/30 border-rose-800/80 text-slate-200 shadow-lg shadow-rose-950/20'
+                }`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-widest block mb-1 ${
+                    recommendationType === 'optimal' 
+                      ? 'text-emerald-400' 
+                      : recommendationType === 'toxic-interval-adjust' || recommendationType === 'subtherapeutic-interval-adjust'
+                        ? 'text-amber-400'
+                        : 'text-rose-400'
+                  }`}>
                     Dosing Recommendation
                   </span>
-                  <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
-                    Adjusting the current interval from{' '}
-                    <span className="font-bold text-slate-200">{interval} hours</span> to{' '}
-                    <span className="font-bold text-emerald-400">{interval + 4} hours</span> is projected to stabilize the patient back within safe therapeutic zones.
-                  </p>
+                  
+                  {recommendationType === 'optimal' && (
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                        Your current dosing regimen is <span className="text-emerald-400 font-bold">optimal</span>. The predicted peak is below the toxic threshold, and the trough remains above the MEC. No adjustments are required.
+                      </p>
+                    </div>
+                  )}
+
+                  {recommendationType === 'toxic-dose-high' && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                        <span className="text-rose-400 font-bold">Dose amount is too high.</span> The single-dose peak concentration (<span className="font-mono text-rose-300 font-semibold">{singleDosePeak.toFixed(2)} mg/L</span>) exceeds the toxic threshold (<span className="font-mono text-slate-300 font-semibold">{toxicThreshold} mg/L</span>). No interval adjustment alone can make this safe.
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-medium">
+                        Recommendation: Consider reducing the Dose Amount below {Math.floor(toxicThreshold * vd)} mg.
+                      </p>
+                    </div>
+                  )}
+
+                  {recommendationType === 'toxic-interval-adjust' && (
+                    <div className="space-y-3">
+                      <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                        Adjusting the current interval from{' '}
+                        <span className="font-bold text-slate-200">{interval} hours</span> to{' '}
+                        <span className="font-bold text-emerald-400">{recommendedInterval} hours</span> (longer) is projected to bring the patient back to safe boundaries.
+                      </p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400 font-mono">
+                        <div>
+                          Current Css Max: <span className="text-rose-400 font-bold">{cssMax.toFixed(2)} mg/L</span>
+                        </div>
+                        <div>
+                          Projected Css Max: <span className="text-emerald-400 font-bold">{cssMaxAtRecommended.toFixed(2)} mg/L</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setInterval(recommendedInterval)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-bold transition-all shadow-sm cursor-pointer flex items-center gap-1.5 w-fit"
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        Apply {recommendedInterval}h Interval
+                      </button>
+                    </div>
+                  )}
+
+                  {recommendationType === 'subtherapeutic-dose-low' && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                        <span className="text-rose-400 font-bold">Dose amount is too low.</span> The current dose is insufficient to maintain effective therapeutic levels above MEC ({mec} mg/L) even at the highest safe frequency (every 4 hours).
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-medium">
+                        Recommendation: Consider increasing the Dose Amount.
+                      </p>
+                    </div>
+                  )}
+
+                  {recommendationType === 'subtherapeutic-interval-adjust' && (
+                    <div className="space-y-3">
+                      <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                        Decreasing the interval from{' '}
+                        <span className="font-bold text-slate-200">{interval} hours</span> to{' '}
+                        <span className="font-bold text-emerald-400">{recommendedInterval} hours</span> (shorter) is projected to restore effective therapeutic levels without risking toxicity.
+                      </p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400 font-mono">
+                        <div>
+                          Current Css Min: <span className="text-amber-400 font-bold">{cssMin.toFixed(2)} mg/L</span>
+                        </div>
+                        <div>
+                          Projected Css Min: <span className="text-emerald-400 font-bold">{cssMinAtRecommended.toFixed(2)} mg/L</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setInterval(recommendedInterval)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-bold transition-all shadow-sm cursor-pointer flex items-center gap-1.5 w-fit"
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        Apply {recommendedInterval}h Interval
+                      </button>
+                    </div>
+                  )}
+
+                  {recommendationType === 'therapeutic-conflict' && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                        <span className="text-rose-400 font-bold">Therapeutic window conflict.</span> Decreasing the interval to achieve efficacy will push peak levels into toxicity, while increasing it to avoid toxicity will cause sub-therapeutic troughs.
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-medium">
+                        Recommendation: Adjust both Dose Amount and Interval or consider an alternative clinical agent.
+                      </p>
+                    </div>
+                  )}
                 </div>
-
               </div>
-
             </div>
-
           </div>
-
         </section>
 
         {/* E. SAVE PATIENT CASE MODAL (no-print) */}
@@ -968,7 +1221,29 @@ export default function App() {
                   <strong>Renal degradation simulation:</strong> A 20% further degradation in this profile's kidney clearance rate will push steady-state concentration up by an additional 25%, modifying your peak projection to <strong className="text-slate-950">{cssMaxDegraded.toFixed(2)} mg/L</strong>.
                 </p>
                 <p>
-                  <strong>Stabilization Plan:</strong> Adjusting the current interval from <strong className="text-slate-950">{interval} hours</strong> to <strong className="text-slate-950">{interval + 4} hours</strong> is projected to stabilize the patient back within safe therapeutic zones.
+                  <strong>Stabilization Plan:</strong>{' '}
+                  {recommendationType === 'optimal' && (
+                    <span>The current dosing regimen is safe and effective. No adjustments are required.</span>
+                  )}
+                  {recommendationType === 'toxic-dose-high' && (
+                    <span>The dose amount is too high. Consider reducing the Dose Amount below {Math.floor(toxicThreshold * vd)} mg, as no interval adjustment alone can make this safe.</span>
+                  )}
+                  {recommendationType === 'toxic-interval-adjust' && (
+                    <span>
+                      Adjusting the current dosing interval from <strong className="text-slate-950">{interval} hours</strong> to <strong className="text-slate-950">{recommendedInterval} hours</strong> is projected to stabilize the patient back within safe therapeutic boundaries (projected peak: <strong className="text-slate-950">{cssMaxAtRecommended.toFixed(2)} mg/L</strong>).
+                    </span>
+                  )}
+                  {recommendationType === 'subtherapeutic-dose-low' && (
+                    <span>The dose amount is too low. Consider increasing the Dose Amount, as the current dose is insufficient to maintain effective levels even at the highest frequency (every 4 hours).</span>
+                  )}
+                  {recommendationType === 'subtherapeutic-interval-adjust' && (
+                    <span>
+                      Decreasing the current dosing interval from <strong className="text-slate-950">{interval} hours</strong> to <strong className="text-slate-950">{recommendedInterval} hours</strong> is projected to restore effective therapeutic levels (projected trough: <strong className="text-slate-950">{cssMinAtRecommended.toFixed(2)} mg/L</strong>).
+                    </span>
+                  )}
+                  {recommendationType === 'therapeutic-conflict' && (
+                    <span>Therapeutic window conflict. Adjust both Dose Amount and Interval or consider an alternative clinical agent.</span>
+                  )}
                 </p>
               </div>
             </div>
