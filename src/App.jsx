@@ -15,7 +15,12 @@ import {
   Sparkles,
   Trash2,
   User,
-  X
+  X,
+  Eye,
+  ChevronDown,
+  ChevronUp,
+  Stethoscope,
+  Pill
 } from 'lucide-react';
 import {
   Area,
@@ -91,6 +96,22 @@ export default function App() {
   const [savedCases, setSavedCases] = useState([]);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [newCaseName, setNewCaseName] = useState('');
+
+  // Active patient and clinical case demographics
+  const [activePatientName, setActivePatientName] = useState('John Doe');
+  const [activeDrugName, setActiveDrugName] = useState('Gentamicin');
+  const [activeConsultingDoctor, setActiveConsultingDoctor] = useState('Dr. Ankush PK');
+  const [activePatientAge, setActivePatientAge] = useState('45');
+  const [activePatientWeight, setActivePatientWeight] = useState('70');
+  const [activePatientGender, setActivePatientGender] = useState('Male');
+  const [activeClinicalNotes, setActiveClinicalNotes] = useState('Standard one-compartment PK simulation baseline.');
+
+  // Collapsible control states
+  const [isPatientInfoExpanded, setIsPatientInfoExpanded] = useState(true);
+
+  // Patient details modal states
+  const [selectedCaseForDetails, setSelectedCaseForDetails] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   
   // Real-time calculated baseline Cl & Vd
   const cl = Number(isAdvancedMode ? customCl : PATIENT_PROFILES[selectedProfileId].cl);
@@ -142,6 +163,13 @@ export default function App() {
     const newCase = {
       id: Date.now().toString(),
       name: newCaseName.trim(),
+      patientName: activePatientName,
+      drugName: activeDrugName,
+      consultingDoctor: activeConsultingDoctor,
+      patientAge: activePatientAge,
+      patientWeight: activePatientWeight,
+      patientGender: activePatientGender,
+      clinicalNotes: activeClinicalNotes,
       profileId: isAdvancedMode ? 'Custom' : selectedProfileId,
       profileName: isAdvancedMode ? 'Advanced User Custom' : PATIENT_PROFILES[selectedProfileId].name,
       dose,
@@ -159,6 +187,13 @@ export default function App() {
     localStorage.setItem('pharmasim_cases', JSON.stringify(updated));
     setNewCaseName('');
     setIsSaveModalOpen(false);
+  };
+
+  // Helper to open save modal with intelligent pre-fill
+  const openSaveModal = () => {
+    const defaultName = `${activePatientName} - ${isAdvancedMode ? 'Custom' : PATIENT_PROFILES[selectedProfileId].name} Run`;
+    setNewCaseName(defaultName);
+    setIsSaveModalOpen(true);
   };
 
   // Delete case handler
@@ -183,6 +218,15 @@ export default function App() {
     setInterval(c.interval);
     setMec(c.mec);
     setToxicThreshold(c.toxicThreshold);
+    
+    // Load patient details
+    setActivePatientName(c.patientName || c.name || 'John Doe');
+    setActiveDrugName(c.drugName || 'Gentamicin');
+    setActiveConsultingDoctor(c.consultingDoctor || 'Dr. Ankush PK');
+    setActivePatientAge(c.patientAge || '45');
+    setActivePatientWeight(c.patientWeight || '70');
+    setActivePatientGender(c.patientGender || 'Male');
+    setActiveClinicalNotes(c.clinicalNotes || '');
   };
 
   // Generate 72-hour PK data points (every 0.5 hours)
@@ -378,11 +422,16 @@ export default function App() {
                   onClick={() => handleLoadCase(c)}
                   className="group w-full p-3 rounded-lg hover:bg-slate-800/60 border border-transparent hover:border-slate-800 text-left transition-all cursor-pointer flex items-start justify-between gap-2"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-slate-200 truncate group-hover:text-emerald-400 transition-colors">
                       {c.name}
                     </p>
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                    <div className="flex items-center gap-1 text-[9px] text-slate-400 truncate mt-0.5 leading-none">
+                      <span className="font-semibold text-emerald-400">{c.drugName || 'Gentamicin'}</span>
+                      <span className="text-slate-600">•</span>
+                      <span>Dr. {c.consultingDoctor || 'Ankush'}</span>
+                    </div>
+                    <p className="text-[9px] text-slate-500 truncate mt-0.5">
                       {c.profileName}
                     </p>
                     <div className="flex items-center gap-1.5 mt-1 text-[9px] text-slate-500 font-mono">
@@ -393,13 +442,26 @@ export default function App() {
                       <span>{parseFloat(c.cl.toFixed(1))}L/h</span>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => handleDeleteCase(c.id, e)}
-                    className="p-1 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Delete Saved Case"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCaseForDetails(c);
+                        setIsDetailsModalOpen(true);
+                      }}
+                      className="p-1 text-slate-500 hover:text-emerald-400 hover:bg-slate-800 rounded transition-colors"
+                      title="View Case Details"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteCase(c.id, e)}
+                      className="p-1 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded transition-colors"
+                      title="Delete Saved Case"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -432,7 +494,7 @@ export default function App() {
 
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => setIsSaveModalOpen(true)}
+              onClick={openSaveModal}
               className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition-all cursor-pointer"
             >
               <Save className="h-4 w-4" />
@@ -560,6 +622,123 @@ export default function App() {
                 <Sliders className="h-4.5 w-4.5 text-slate-500" />
                 <span>Simulation Parameters</span>
               </h3>
+            </div>
+
+            {/* Collapsible Patient & Case Info Panel */}
+            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden shadow-xs transition-all duration-300">
+              <button
+                type="button"
+                onClick={() => setIsPatientInfoExpanded(!isPatientInfoExpanded)}
+                className="w-full flex items-center justify-between p-3 text-left font-bold text-xs text-slate-700 hover:bg-slate-100 transition-colors border-none outline-none"
+              >
+                <div className="flex items-center gap-2 uppercase tracking-wider">
+                  <Stethoscope className="h-4 w-4 text-emerald-600" />
+                  <span>Patient & Drug Details</span>
+                </div>
+                {isPatientInfoExpanded ? (
+                  <ChevronUp className="h-4 w-4 text-slate-500" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-slate-500" />
+                )}
+              </button>
+              
+              {isPatientInfoExpanded && (
+                <div className="p-3.5 border-t border-slate-200 space-y-3 bg-white">
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Patient Name / ID
+                      </label>
+                      <input
+                        type="text"
+                        value={activePatientName}
+                        onChange={(e) => setActivePatientName(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:ring-1 focus:ring-emerald-500 outline-none"
+                        placeholder="e.g. John Doe"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Drug Name
+                      </label>
+                      <input
+                        type="text"
+                        value={activeDrugName}
+                        onChange={(e) => setActiveDrugName(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:ring-1 focus:ring-emerald-500 outline-none"
+                        placeholder="e.g. Gentamicin"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Age (yrs)
+                      </label>
+                      <input
+                        type="number"
+                        value={activePatientAge}
+                        onChange={(e) => setActivePatientAge(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:ring-1 focus:ring-emerald-500 outline-none"
+                        placeholder="45"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Weight (kg)
+                      </label>
+                      <input
+                        type="number"
+                        value={activePatientWeight}
+                        onChange={(e) => setActivePatientWeight(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:ring-1 focus:ring-emerald-500 outline-none"
+                        placeholder="70"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Gender
+                      </label>
+                      <select
+                        value={activePatientGender}
+                        onChange={(e) => setActivePatientGender(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:ring-1 focus:ring-emerald-500 outline-none"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      Consulting Doctor
+                    </label>
+                    <input
+                      type="text"
+                      value={activeConsultingDoctor}
+                      onChange={(e) => setActiveConsultingDoctor(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:ring-1 focus:ring-emerald-500 outline-none"
+                      placeholder="e.g. Dr. Ankush"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      Clinical Notes / History
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={activeClinicalNotes}
+                      onChange={(e) => setActiveClinicalNotes(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:ring-1 focus:ring-emerald-500 outline-none resize-none"
+                      placeholder="Clinical remarks..."
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Patient Profile Selection */}
@@ -1050,7 +1229,7 @@ export default function App() {
         {/* E. SAVE PATIENT CASE MODAL (no-print) */}
         {isSaveModalOpen && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 no-print animate-fade-in">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 relative">
               <button
                 onClick={() => setIsSaveModalOpen(false)}
                 className="absolute right-4 top-4 p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
@@ -1058,34 +1237,56 @@ export default function App() {
                 <X className="h-4 w-4" />
               </button>
 
-              <h3 className="text-base font-bold text-slate-900 pr-8">
-                Save Patient Profile Run
+              <h3 className="text-base font-bold text-slate-900 pr-8 flex items-center gap-2">
+                <Save className="h-5 w-5 text-emerald-600" />
+                <span>Save Patient Case Record</span>
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Save these exact PK parameters to the browser history to reload them with one click.
+                Commit these parameters and demographic details to history to reload or print later.
               </p>
 
               <form onSubmit={handleSaveCase} className="mt-4 space-y-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Case / Patient Identifier Name
+                    Case / Record Identifier
                   </label>
                   <input
                     autoFocus
                     type="text"
                     required
-                    placeholder="e.g. Pt-72A Renal Adjustment"
+                    placeholder="e.g. John Doe - Renal Dosing Run"
                     value={newCaseName}
                     onChange={(e) => setNewCaseName(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                   />
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-[10px] text-slate-500 space-y-1 font-mono">
-                  <div className="flex justify-between"><span>Profile:</span><span className="font-semibold">{isAdvancedMode ? 'Custom Advanced' : PATIENT_PROFILES[selectedProfileId].name}</span></div>
-                  <div className="flex justify-between"><span>Dose Amount:</span><span className="font-semibold">{dose} mg</span></div>
-                  <div className="flex justify-between"><span>Dosing Interval:</span><span className="font-semibold">{interval} hours</span></div>
-                  <div className="flex justify-between"><span>Clearance / Vd:</span><span className="font-semibold">{cl.toFixed(2)} L/h / {vd} L</span></div>
+                {/* Patient Case Demographics Review */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+                  <div className="bg-slate-100/60 px-3.5 py-2 border-b border-slate-200 flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-slate-500" />
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Demographic & Dose Summary</span>
+                  </div>
+                  <div className="p-3 text-[11px] text-slate-600 space-y-1.5 font-sans leading-relaxed">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                      <div><span className="text-slate-400 font-medium">Patient:</span> <strong className="text-slate-800">{activePatientName}</strong></div>
+                      <div><span className="text-slate-400 font-medium">Demographics:</span> <strong className="text-slate-800">{activePatientAge}y / {activePatientWeight}kg / {activePatientGender}</strong></div>
+                      <div><span className="text-slate-400 font-medium">Prescribed Drug:</span> <strong className="text-emerald-700">{activeDrugName}</strong></div>
+                      <div><span className="text-slate-400 font-medium">Consulting:</span> <strong className="text-slate-800">Dr. {activeConsultingDoctor}</strong></div>
+                    </div>
+                    <div className="border-t border-slate-200/60 my-1.5 pt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px]">
+                      <div className="flex justify-between"><span>Profile:</span><span className="font-semibold text-slate-700">{isAdvancedMode ? 'Custom Advanced' : PATIENT_PROFILES[selectedProfileId].name}</span></div>
+                      <div className="flex justify-between"><span>Dose/Interval:</span><span className="font-semibold text-slate-700">{dose} mg / {interval}h</span></div>
+                      <div className="flex justify-between"><span>Clearance:</span><span className="font-semibold text-slate-700">{cl.toFixed(2)} L/h</span></div>
+                      <div className="flex justify-between"><span>Vd:</span><span className="font-semibold text-slate-700">{vd.toFixed(1)} L</span></div>
+                    </div>
+                    {activeClinicalNotes && (
+                      <div className="border-t border-slate-200/60 pt-1.5">
+                        <span className="text-slate-400 font-medium block mb-0.5 text-[9px] uppercase tracking-wider">Notes:</span>
+                        <p className="text-[10px] text-slate-500 italic line-clamp-2 leading-snug">{activeClinicalNotes}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">
@@ -1100,13 +1301,278 @@ export default function App() {
                     type="submit"
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
                   >
-                    Save Case
+                    Save Case Record
                   </button>
                 </div>
               </form>
             </div>
           </div>
         )}
+
+        {/* F. PATIENT CASE DETAILS MODAL (no-print) */}
+        {isDetailsModalOpen && selectedCaseForDetails && (() => {
+          const c = selectedCaseForDetails;
+          // PK calculations for the selected case
+          const cKe = c.vd > 0 ? c.cl / c.vd : 0;
+          const cHalfLife = cKe > 0 ? 0.693 / cKe : 0;
+          const cTimeToSteadyState = 4.5 * cHalfLife;
+          const cExpTerm1 = Math.exp(-cKe * Number(c.interval));
+          const cCssMax = c.vd > 0 && (1 - cExpTerm1) > 0 ? (Number(c.dose) / c.vd) / (1 - cExpTerm1) : 0;
+          const cCssMin = cCssMax * cExpTerm1;
+          const cIsToxic = cCssMax > Number(c.toxicThreshold);
+          const cIsSubTherapeutic = cCssMin < Number(c.mec);
+          
+          const cPeakSafetyMargin = Number(c.toxicThreshold) > 0 ? (cCssMax / Number(c.toxicThreshold)) * 100 : 0;
+          const cTroughEfficacyMargin = Number(c.mec) > 0 ? (cCssMin / Number(c.mec)) * 100 : 0;
+
+          return (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 no-print animate-fade-in">
+              <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 relative flex flex-col max-h-[90vh]">
+                <button
+                  onClick={() => {
+                    setIsDetailsModalOpen(false);
+                    setSelectedCaseForDetails(null);
+                  }}
+                  className="absolute right-4 top-4 p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors border-none bg-transparent cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+
+                {/* Modal Title */}
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-3 shrink-0">
+                  <div className="p-2 bg-emerald-50 text-emerald-700 rounded-lg">
+                    <Stethoscope className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 pr-8">
+                      Patient Medical Case Record
+                    </h3>
+                    <p className="text-[10px] text-slate-450 font-mono tracking-wide uppercase mt-0.5">
+                      Case Identifier: {c.name}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Scrollable details container */}
+                <div className="flex-1 overflow-y-auto pr-1 py-4 space-y-4 dark-scroll">
+                  
+                  {/* Safety Status Banner */}
+                  {cIsToxic ? (
+                    <div className="bg-red-50 border border-red-200 p-3 rounded-xl flex items-start gap-2.5">
+                      <ShieldAlert className="h-4.5 w-4.5 text-red-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-[10px] font-bold text-red-800 uppercase tracking-wide block">CRITICAL REGIMEN ALERT</span>
+                        <p className="text-[11px] text-red-950 font-medium leading-relaxed mt-0.5">
+                          Calculated peak level ({cCssMax.toFixed(2)} mg/L) exceeds the toxic threshold of {c.toxicThreshold} mg/L. Regimen contains high toxicity risk.
+                        </p>
+                      </div>
+                    </div>
+                  ) : cIsSubTherapeutic ? (
+                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-start gap-2.5">
+                      <AlertTriangle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wide block">SUB-THERAPEUTIC WARNING</span>
+                        <p className="text-[11px] text-amber-950 font-medium leading-relaxed mt-0.5">
+                          Calculated trough level ({cCssMin.toFixed(2)} mg/L) drops below effective target MEC ({c.mec} mg/L). Regimen contains efficacy failure risk.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex items-start gap-2.5">
+                      <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wide block">SAFE THERAPEUTIC PROFILE</span>
+                        <p className="text-[11px] text-emerald-950 font-medium leading-relaxed mt-0.5">
+                          Patient dosing targets are successfully met. Predicted concentration peaks and troughs reside safely within the therapeutic window.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Section A: Demographics Chart */}
+                  <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 space-y-3">
+                    <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block border-b border-slate-200/60 pb-1">
+                      I. Patient Demographics & Prescription Info
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 text-xs">
+                      <div>
+                        <span className="text-slate-450 font-medium block">Patient Name:</span>
+                        <strong className="text-slate-800 font-semibold">{c.patientName || c.name || 'John Doe'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-medium block">Demographics:</span>
+                        <strong className="text-slate-800 font-semibold">{c.patientAge || '45'} yrs / {c.patientWeight || '70'} kg / {c.patientGender || 'Male'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-medium block">Prescribed Drug:</span>
+                        <strong className="text-emerald-700 font-bold flex items-center gap-1">
+                          <Pill className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                          <span>{c.drugName || 'Gentamicin'}</span>
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-medium block">Consulting Doctor:</span>
+                        <strong className="text-slate-800 font-semibold">Dr. {c.consultingDoctor || 'Ankush PK'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-medium block">Recorded On:</span>
+                        <strong className="text-slate-600 font-semibold">{c.timestamp}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section B: Simulator Sliders Profile */}
+                  <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 space-y-3">
+                    <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block border-b border-slate-200/60 pb-1">
+                      II. Simulation Inputs & Baseline Clearance
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-3 gap-x-4 text-xs font-medium">
+                      <div>
+                        <span className="text-slate-450 font-normal block">Prescribed Dose:</span>
+                        <span className="text-slate-800">{c.dose} mg</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-normal block">Interval (Tau):</span>
+                        <span className="text-slate-800">{c.interval} hours</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-normal block">Target MEC:</span>
+                        <span className="text-slate-800">{c.mec} mg/L</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-normal block">Toxic Threshold:</span>
+                        <span className="text-slate-800">{c.toxicThreshold} mg/L</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-normal block">Clinical Preset:</span>
+                        <span className="text-slate-800">{c.profileName}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-normal block">Clearance (Cl):</span>
+                        <span className="text-slate-800">{c.cl.toFixed(2)} L/h</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-normal block">Vol. of Dist (Vd):</span>
+                        <span className="text-slate-800">{c.vd.toFixed(1)} L</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-450 font-normal block">Elimination Rate (ke):</span>
+                        <span className="text-slate-800 font-mono">{cKe.toFixed(4)} h⁻¹</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section C: Math Output Metrics */}
+                  <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 space-y-3">
+                    <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block border-b border-slate-200/60 pb-1">
+                      III. Calculated Steady-State Indexes
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      
+                      {/* Metric 1 */}
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-center">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Peak (Css Max)</span>
+                        <strong className="text-sm font-extrabold text-slate-800 block mt-0.5">{cCssMax.toFixed(2)} mg/L</strong>
+                        <span className={`text-[8px] font-semibold px-1 rounded-full mt-1 inline-block ${cIsToxic ? 'bg-red-50 text-red-655' : 'bg-emerald-50 text-emerald-600'}`}>
+                          {cPeakSafetyMargin.toFixed(0)}% of limit
+                        </span>
+                      </div>
+
+                      {/* Metric 2 */}
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-center">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Trough (Css Min)</span>
+                        <strong className="text-sm font-extrabold text-slate-800 block mt-0.5">{cCssMin.toFixed(2)} mg/L</strong>
+                        <span className={`text-[8px] font-semibold px-1 rounded-full mt-1 inline-block ${cIsSubTherapeutic ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-600'}`}>
+                          {cTroughEfficacyMargin.toFixed(0)}% of MEC
+                        </span>
+                      </div>
+
+                      {/* Metric 3 */}
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-center">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Half-Life</span>
+                        <strong className="text-sm font-extrabold text-slate-800 block mt-0.5">{cHalfLife.toFixed(2)} hrs</strong>
+                        <span className="text-[8px] text-slate-450 block mt-1">t1/2</span>
+                      </div>
+
+                      {/* Metric 4 */}
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-center">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">SS Time</span>
+                        <strong className="text-sm font-extrabold text-slate-800 block mt-0.5">{cTimeToSteadyState.toFixed(1)} hrs</strong>
+                        <span className="text-[8px] text-slate-450 block mt-1">Stabilization</span>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Section D: Clinical Notes display */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block">
+                      IV. Clinical Assessment / Physician Notes
+                    </span>
+                    <div className="bg-slate-50 border-l-4 border-emerald-500 rounded-r-lg p-3 text-xs italic text-slate-700 leading-relaxed font-serif whitespace-pre-wrap">
+                      {c.clinicalNotes || 'No notes entered for this case run.'}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="flex flex-col sm:flex-row justify-between gap-2 border-t border-slate-100 pt-4 shrink-0">
+                  <button
+                    onClick={(e) => {
+                      handleDeleteCase(c.id, e);
+                      setIsDetailsModalOpen(false);
+                      setSelectedCaseForDetails(null);
+                    }}
+                    className="px-4 py-2 border border-rose-300 hover:bg-rose-50 text-rose-600 text-xs font-semibold rounded-lg transition-colors cursor-pointer sm:order-first bg-transparent"
+                  >
+                    Delete Case Record
+                  </button>
+
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <button
+                      onClick={() => {
+                        setIsDetailsModalOpen(false);
+                        setSelectedCaseForDetails(null);
+                      }}
+                      className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-750 text-xs font-semibold rounded-lg transition-colors cursor-pointer bg-transparent"
+                    >
+                      Close
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        handleLoadCase(c);
+                        setIsDetailsModalOpen(false);
+                        setSelectedCaseForDetails(null);
+                        // Trigger print after loading the case
+                        setTimeout(() => {
+                          window.print();
+                        }, 250);
+                      }}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+                    >
+                      <Printer className="h-4 w-4 text-slate-500" />
+                      <span>Print Case Report</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        handleLoadCase(c);
+                        setIsDetailsModalOpen(false);
+                        setSelectedCaseForDetails(null);
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer border-none"
+                    >
+                      Load in Simulator
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 3. PRINT ONLY CLINICAL REPORT CONTAINER (Hidden on screen, styled beautifully for window.print()) */}
         <div className="print-only hidden print-container font-sans bg-white text-slate-800">
@@ -1122,14 +1588,39 @@ export default function App() {
             </div>
           </div>
 
-          {/* Section 1: Patient Criteria */}
+          {/* Section 1: Patient & Case Demographics */}
           <div className="mb-6 print-panel-block">
             <h3 className="text-xs font-bold text-slate-950 uppercase tracking-widest border-b border-slate-300 pb-1.5 mb-3">
-              I. Clinical Parameters & Baseline Patient Profile
+              I. Patient & Clinical Demographics
             </h3>
             <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-xs border border-slate-200 rounded-lg p-4 bg-slate-50/50">
               <div>
-                <span className="text-slate-500 font-medium">Selected Clinical Profile:</span>{' '}
+                <span className="text-slate-500 font-medium">Patient Name:</span>{' '}
+                <strong className="text-slate-950">{activePatientName}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500 font-medium">Drug Prescribed:</span>{' '}
+                <strong className="text-slate-950 text-emerald-700">{activeDrugName}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500 font-medium">Age / Weight / Gender:</span>{' '}
+                <strong className="text-slate-950">{activePatientAge} yrs / {activePatientWeight} kg / {activePatientGender}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500 font-medium">Consulting Doctor:</span>{' '}
+                <strong className="text-slate-950">Dr. {activeConsultingDoctor}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Clinical Parameters */}
+          <div className="mb-6 print-panel-block">
+            <h3 className="text-xs font-bold text-slate-950 uppercase tracking-widest border-b border-slate-300 pb-1.5 mb-3">
+              II. Prescribed Regimen & Compartment Parameters
+            </h3>
+            <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-xs border border-slate-200 rounded-lg p-4 bg-slate-50/50">
+              <div>
+                <span className="text-slate-500 font-medium">Clinical Profile:</span>{' '}
                 <strong className="text-slate-950">{isAdvancedMode ? 'Manual Advanced Custom Override' : PATIENT_PROFILES[selectedProfileId].name}</strong>
               </div>
               <div>
@@ -1163,10 +1654,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* Section 2: Calculated Metrics Grid */}
+          {/* Section 3: Calculated Metrics Grid */}
           <div className="mb-6 print-panel-block">
             <h3 className="text-xs font-bold text-slate-950 uppercase tracking-widest border-b border-slate-300 pb-1.5 mb-3">
-              II. Calculated Steady-State Indexes
+              III. Calculated Steady-State Indexes
             </h3>
             <div className="metrics-grid-print">
               <div className="metric-card-print">
@@ -1192,10 +1683,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* Section 3: Diagnostic Assessment */}
+          {/* Section 4: Diagnostic Assessment */}
           <div className="mb-6 print-panel-block border-print">
             <h3 className="text-xs font-bold text-slate-950 uppercase tracking-widest border-b border-slate-300 pb-1.5 mb-3">
-              III. Safety Status & Dynamic Clinical Diagnostics
+              IV. Safety Status & Dynamic Clinical Diagnostics
             </h3>
             
             <div className="space-y-4">
@@ -1249,13 +1740,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* Section 4: Signature / Clinical Notes Block */}
-          <div className="mt-16 print-panel-block border-t border-slate-300 pt-6">
+          {/* Section 5: Signature / Clinical Notes Block */}
+          <div className="mt-12 print-panel-block border-t border-slate-300 pt-6">
             <div className="flex justify-between items-start">
               <div className="w-1/2">
                 <p className="text-xs font-bold text-slate-900 uppercase mb-2">Physician/Pharmacist Clinical Notes</p>
-                <div className="h-24 border border-slate-300 rounded-lg p-2 bg-slate-50/20 text-slate-400 text-[10px] italic">
-                  Enter physician annotations, target adjustments, or clinical observations here...
+                <div className="border border-slate-300 rounded-lg p-3 bg-slate-50/20 text-slate-800 text-[11px] leading-relaxed whitespace-pre-wrap font-serif italic">
+                  {activeClinicalNotes || 'No clinical notes recorded.'}
                 </div>
               </div>
               <div className="w-1/3 text-right">
