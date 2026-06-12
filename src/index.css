@@ -2,45 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Apple Glassmorphism Utility */
+.apple-glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(241, 245, 249, 0.6);
+  box-shadow: 0 8px 32px 0 rgba(148, 163, 184, 0.05);
 }
-::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.05);
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(15, 23, 42, 0.2);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(15, 23, 42, 0.4);
-}
-
-/* Dark mode-ish styling for the scrollbars */
-.dark-scroll::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
-}
-.dark-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-}
-.dark-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+.dark .apple-glass {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
 }
 
-/* Pulse animation for safety alerts */
-@keyframes critical-pulse {
+/* Google Health Soft Card */
+.google-card {
+  border-radius: 28px;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.06);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dark .google-card {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.3);
+}
+.google-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px -4px rgba(148, 163, 184, 0.12);
+}
+.dark .google-card:hover {
+  border-color: rgba(59, 130, 246, 0.25);
+  box-shadow: 0 16px 40px -4px rgba(59, 130, 246, 0.05);
+}
+
+/* Blue gradient text clip */
+.text-gradient-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.dark .text-gradient-blue {
+  background: linear-gradient(135deg, #60a5fa 0%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Custom fade-in and slide animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom pulse animations for active indicators */
+@keyframes active-pulse {
   0%, 100% {
-    opacity: 1;
     transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
   }
   50% {
-    opacity: 0.95;
+    transform: scale(1.05);
+    box-shadow: 0 0 12px 2px rgba(59, 130, 246, 0.2);
   }
 }
-.pulse-critical {
-  animation: critical-pulse 2s infinite ease-in-out;
+.pulse-active-blue {
+  animation: active-pulse 2s infinite ease-in-out;
+}
+
+/* Print utility for screen-hiding */
+.print-only {
+  display: none !important;
 }
 
 /* Printable report styles */
